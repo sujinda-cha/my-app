@@ -1,12 +1,16 @@
 'use client'
 import { useSearchParams } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
 export default function Callback() {
     const searchParams = useSearchParams()
+    const [tk, setTk] = useState<string>()
 
     useEffect(() => {
         const search = searchParams.get('token')
+        if (search) {
+            setTk(search)
+        }
     })
     useEffect(() => {
         const handle = async () => {
@@ -41,5 +45,16 @@ export default function Callback() {
         handle()
     }, [])
 
-    return <div>Logging in...</div>
+    return (
+        <div className="">
+            <div className="flex">
+                <div className="text-5xl">Token</div>
+            </div>
+                <div className="break-all">
+                    <p>{tk}</p>
+                </div>
+
+            <div className="mt-6">Logging in...</div>
+        </div>
+    )
 }

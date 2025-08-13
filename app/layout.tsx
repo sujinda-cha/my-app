@@ -27,8 +27,8 @@ export default function RootLayout({
       <body
       // className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <div className="bg-amber-400 h-[80px] w-full text-black flex items-center">TOPBARR</div>
-        <div className="px-[40px] py-[20px]">
+        <div className="bg-amber-400 h-[80px] w-full text-black flex items-center pl-[40px] ">OKTA DEMO</div>
+        <div className="px-[40px] py-[20px] w-full">
           {children}
         </div>
       </body>
