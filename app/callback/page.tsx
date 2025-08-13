@@ -32,11 +32,11 @@ function CallbackInner() {
         if (tokenFromQuery) setIdToken(tokenFromQuery);
     }, [tokenFromQuery]);
     useEffect(() => {
-        if (at) setIdToken(at);
-    }, [tokenFromQuery]);
+        if (at) setAc(at);
+    }, [at]);
     useEffect(() => {
-        if (rt) setIdToken(rt);
-    }, [tokenFromQuery]);
+        if (rt) setRe(rt);
+    }, [rt]);
 
     // Read the authorization code once
     const code = useMemo(() => searchParams.get("code"), [searchParams]);
