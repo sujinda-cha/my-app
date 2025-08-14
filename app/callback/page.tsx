@@ -2,9 +2,14 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { apiFetch, GoRes } from "@/utils/api";
 
 type Status = "idle" | "exchanging" | "calling-api" | "done" | "error";
 
+type DataO = {
+    accessToken:string,
+    refreshToken:string,
+}
 const TOKEN_PLACEHOLDER = "•••"; // don’t leak the whole token in the UI
 
 // Top-level page component: provides the Suspense boundary
@@ -21,8 +26,11 @@ function CallbackInner() {
     const [status, setStatus] = useState<Status>("idle");
     const [error, setError] = useState<string | null>(null);
     const [idToken, setIdToken] = useState<string | null>(null);
-    const [ac, setAc] = useState<string | null>(null);
+    const [ac, setAc] = useState<string>("");
     const [re, setRe] = useState<string | null>(null);
+
+    const [oldAc, setOldAc] = useState<string>("");
+    const [oldRe, setOldRe] = useState<string | null>(null);
 
     // Optional: support ?token=... in the URL to show something immediately
     const tokenFromQuery = searchParams.get("token");
@@ -121,6 +129,46 @@ function CallbackInner() {
         exchange();
     }, [code]);
 
+    const refreshToken = async () => {
+        try {
+            const res:GoRes<DataO> = await apiFetch("http://127.0.0.1:12345/api/v1/auth/refresh",
+                {
+                    method: "POST",
+                    body: {
+                        "refreshToken": rt,
+                    },
+                    token: ac || "",
+                }
+            )
+            if (res.code === 0) {
+                console.log("log refresh", res)
+                setOldAc(ac)
+                setOldRe(re)
+                setAc(res.data?.accessToken)
+                setRe(res.data?.refreshToken)
+            } else {
+                console.error("Login failed:", res.message);
+            }
+        } catch (error: unknown) {
+            console.log(error)
+        }
+    }
+    const revokeToken = async () => {
+        try {
+            const res = await apiFetch("http://127.0.0.1:12345/api/v1/auth/revoke",
+                {
+                    method: "POST",
+                    body: {},
+                    token: ac || "",
+                }
+            )
+            if (res.code === 0) {
+                console.log("log revoke", res)
+            }
+        } catch (error) {
+            console.log(error)
+        }
+    }
     return (
         <div className="p-6 space-y-4">
             <h1 className="text-2xl font-semibold">Callback</h1>
@@ -143,38 +191,78 @@ function CallbackInner() {
                 </div>
             )}
 
-            <div className="space-y-2">
-                <div className="text-lg font-medium">ID Token</div>
-                <div className="text-xs text-gray-500">
-                    {/* (Hidden in UI to avoid leaking sensitive data) */}
-                </div>
-                <div className="break-all font-mono rounded-md border p-2 bg-gray-50">
-                    {idToken ? idToken : TOKEN_PLACEHOLDER}
+            <div className="flex gap-[20px]">
+                <div className="w-[50%]">
+                    <div className="space-y-2">
+                        <div className="text-lg font-medium">ID Token</div>
+                        <div className="text-xs text-gray-500">
+                            {/* (Hidden in UI to avoid leaking sensitive data) */}
+                        </div>
+                        <div className="break-all font-mono rounded-md border p-2 bg-gray-50">
+                            {idToken ? idToken : TOKEN_PLACEHOLDER}
 
-                </div>
-            </div>
-            <div className="space-y-2">
-                <div className="text-lg font-medium">Access Token</div>
-                <div className="text-xs text-gray-500">
-                    {/* (Hidden in UI to avoid leaking sensitive data) */}
-                </div>
-                <div className="break-all font-mono rounded-md border p-2 bg-gray-50">
-                    {ac ? ac : TOKEN_PLACEHOLDER}
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <div className="text-lg font-medium">Access Token</div>
+                        <div className="text-xs text-gray-500">
+                            {/* (Hidden in UI to avoid leaking sensitive data) */}
+                        </div>
+                        <div className="break-all font-mono rounded-md border p-2 bg-gray-50">
+                            {ac ? ac : TOKEN_PLACEHOLDER}
 
-                </div>
-            </div>
-            <div className="space-y-2">
-                <div className="text-lg font-medium">Refresh Token</div>
-                <div className="text-xs text-gray-500">
-                    {/* (Hidden in UI to avoid leaking sensitive data) */}
-                </div>
-                <div className="break-all font-mono rounded-md border p-2 bg-gray-50">
-                    {re ? re : TOKEN_PLACEHOLDER}
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <div className="text-lg font-medium">Refresh Token</div>
+                        <div className="text-xs text-gray-500">
+                            {/* (Hidden in UI to avoid leaking sensitive data) */}
+                        </div>
+                        <div className="break-all font-mono rounded-md border p-2 bg-gray-50">
+                            {re ? re : TOKEN_PLACEHOLDER}
 
+                        </div>
+                    </div>
+                </div>
+                <div className="w-[50%]">
+
+                    <div className="space-y-2">
+                        <div className="text-lg font-medium text-gray-700">Old Access Token</div>
+                        <div className="text-xs text-gray-500">
+                            {/* (Hidden in UI to avoid leaking sensitive data) */}
+                        </div>
+                        <div className="break-all font-mono rounded-md border p-2 bg-gray-50">
+                            {oldAc ? oldAc : TOKEN_PLACEHOLDER}
+
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <div className="text-lg font-medium text-gray-700">Old Refresh Token</div>
+                        <div className="text-xs text-gray-500">
+                            {/* (Hidden in UI to avoid leaking sensitive data) */}
+                        </div>
+                        <div className="break-all font-mono rounded-md border p-2 bg-gray-50">
+                            {oldRe ? oldRe : TOKEN_PLACEHOLDER}
+
+                        </div>
+                    </div>
                 </div>
             </div>
 
             {status !== "done" && <LoadingUI label="Logging in..." />}
+
+            <button
+                className="mt-6 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-2xl text-white transition"
+                onClick={refreshToken}
+            >
+                Refresh Okta Token
+            </button>
+            <button
+                className="mt-6 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-2xl text-white transition"
+                onClick={revokeToken}
+            >
+                Revoke with Okta
+            </button>
         </div>
     );
 }
@@ -188,11 +276,6 @@ function LoadingUI({ label }: { label: string }) {
     );
 }
 
-function maskToken(tk: string) {
-    // show small prefix & suffix for debugging, hide middle
-    if (tk.length <= 16) return "•••";
-    return `${tk.slice(0, 10)}…${tk.slice(-10)}`;
-}
 
 function truncate(s: string, max: number) {
     return s.length > max ? s.slice(0, max - 1) + "…" : s;
