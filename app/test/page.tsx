@@ -311,8 +311,105 @@ function CallbackInner() {
                 className="mt-6 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-2xl text-white transition"
                 onClick={revokeToken}
             >
-                Revoke Token
+                Revoke Okta
             </button>
+
+            <div className="flex gap-[20px]">
+                <div className="w-[50%]">
+                    <label htmlFor="api-url" className="w-24">
+                        API URL:
+                    </label>
+                    <input
+                        id="api-url"
+                        type="text"
+                        value={url}
+                        onChange={handleChange}
+                        placeholder={DEFAULT_ROUTE}
+                        className="border mb-2 border-amber-600 rounded-lg h-8 w-full px-2 outline-none"
+                    />
+                    <label htmlFor="api-url" className="w-24">
+                        Body (json):
+                    </label>
+                    <textarea
+                        id="api-url"
+                        value={reqBody}
+                        onChange={handleChangeTX}
+                        placeholder={"json only"}
+                        className="border mb-2 border-amber-600 rounded-lg h-[200px] w-full px-2 outline-none"
+                    />
+                    <label className="" htmlFor="">Method :</label>
+                    <div className="flex items-center gap-4">
+                        <label className="inline-flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="fileType"
+                                value="GET"
+                                checked={selected === 'GET'}
+                                onChange={(e) => setSelected(e.target.value)}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-green-700">GET</span>
+                        </label>
+
+                        <label className="inline-flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="fileType"
+                                value="POST"
+                                checked={selected === 'POST'}
+                                onChange={(e) => setSelected(e.target.value)}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-yellow-600">POST</span>
+                        </label>
+                        <label className="inline-flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="fileType"
+                                value="PUT"
+                                checked={selected === 'PUT'}
+                                onChange={(e) => setSelected(e.target.value)}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-blue-500">PUT</span>
+                        </label>
+                        <label className="inline-flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="fileType"
+                                value="POST"
+                                checked={selected === 'PATCH'}
+                                onChange={(e) => setSelected(e.target.value)}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-purple-500">PATCH</span>
+                        </label>
+                        <label className="inline-flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="fileType"
+                                value="DELETE"
+                                checked={selected === 'DELETE'}
+                                onChange={(e) => setSelected(e.target.value)}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-red-500">DELETE</span>
+                        </label>
+                    </div>
+                    <button
+                        className="mt-6 px-4 py-2 bg-red-500 hover:bg-amber-600 rounded-2xl text-white transition"
+                        onClick={gogo}
+                    >
+                        Fire !!!
+                    </button>
+                </div>
+                <div className="w-[50%]">
+                    <label htmlFor="">
+                        Result Here
+                    </label>
+                    <textarea className="border mb-2 border-amber-600 rounded-lg h-[600px] w-full px-2 outline-none" name="" id="" readOnly value={JSON.stringify(result, null, 2)}></textarea>
+                </div>
+            </div>
 
         </div>
     );

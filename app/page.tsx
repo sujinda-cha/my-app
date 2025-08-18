@@ -2,7 +2,7 @@
 
 import React, { useCallback, useMemo, useState } from "react";
 
-const DEFAULT_LOGIN = "http://localhost:8080/api/start-login";
+const DEFAULT_LOGIN = "http://localhost:12345/api/v1/authentication/login";
 
 export default function Home() {
   const [url, setUrl] = useState<string>("");
