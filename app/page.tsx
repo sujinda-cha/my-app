@@ -1,7 +1,6 @@
 "use client";
 
 import React, {useCallback, useEffect, useMemo, useState} from "react";
-import {useSearchParams} from "next/navigation";
 
 const issuer = "CORE" // CORE COUNTER MOBILE
 const DEFAULT_LOGIN = `${process.env.NEXT_PUBLIC_API}/v1/authentication/login?issuer=${issuer}&clientId=${process.env.NEXT_PUBLIC_OKTA_CLIENT_ID}`;
@@ -9,16 +8,12 @@ const DEFAULT_LOGIN = `${process.env.NEXT_PUBLIC_API}/v1/authentication/login?is
 export default function Home() {
     const [url, setUrl] = useState<string>("");
 
-    const searchParams = useSearchParams()
     useEffect(() => {
-        // If the URL is provided in search params, use it
-        const autoTrigger = searchParams.get("trig") === "true";
-
-        // If auto-trigger is enabled, automatically log in
-        if (autoTrigger) {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("trig") === "true") {
             window.location.assign(DEFAULT_LOGIN);
         }
-    }, [searchParams]);
+    }, []);
 
     const handleChange = useCallback(
         (e: React.ChangeEvent<HTMLInputElement>) => {
