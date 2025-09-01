@@ -80,7 +80,7 @@ function CallbackInner() {
             const method = (selected || "GET").toUpperCase();
 
             // parse อย่างปลอดภัย + ปล่อย undefined ถ้าไม่มี body
-            let body: any | undefined = undefined;
+            let body ;
             if (reqBody && reqBody.trim() !== "") {
                 try {
                     body = JSON.parse(reqBody);

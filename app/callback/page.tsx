@@ -1,17 +1,18 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { apiFetch, GoRes } from "@/utils/api";
 
 type Status = "idle" | "exchanging" | "calling-api" | "done" | "error";
 
 type DataO = {
-    accessToken: string,
-    refreshToken: string,
-}
-const TOKEN_PLACEHOLDER = "•••"; // don’t leak the whole token in the UI
-const DEFAULT_ROUTE = "http://localhost:12345/api/v1/";
+    accessToken: string;
+    refreshToken: string;
+};
+
+const TOKEN_PLACEHOLDER = "•••"; // ไม่โชว์ token เต็มใน UI
+
 // Top-level page component: provides the Suspense boundary
 export default function CallbackPage() {
     return (
@@ -23,85 +24,40 @@ export default function CallbackPage() {
 
 function CallbackInner() {
     const searchParams = useSearchParams();
+
     const [status, setStatus] = useState<Status>("idle");
     const [error, setError] = useState<string | null>(null);
+
     const [idToken, setIdToken] = useState<string | null>(null);
-    const [ac, setAc] = useState<string>("");
-    const [re, setRe] = useState<string | null>(null);
-    const [url, setUrl] = useState<string>("http://localhost:12345/api/v1/");
-    const [result, setResult] = useState<object>();
+    const [ac, setAc] = useState<string>(""); // access token
+    const [re, setRe] = useState<string | null>(null); // refresh token
+
     const [oldAc, setOldAc] = useState<string>("");
     const [oldRe, setOldRe] = useState<string | null>(null);
 
-    const [selected, setSelected] = useState<string>("POST");
-    const [reqBody, setReqBody] = useState<string>("");
-
-    // Optional: support ?token=... in the URL to show something immediately
+    // รับ token จาก query (ถ้ามี)
     const tokenFromQuery = searchParams.get("token");
     const at = searchParams.get("at");
     const rt = searchParams.get("rt");
+
     useEffect(() => {
         if (tokenFromQuery) setIdToken(tokenFromQuery);
     }, [tokenFromQuery]);
+
     useEffect(() => {
         if (at) setAc(at);
     }, [at]);
+
     useEffect(() => {
         if (rt) setRe(rt);
     }, [rt]);
 
-    const handleChange = useCallback(
-        (e: React.ChangeEvent<HTMLInputElement>) => {
-            setUrl(e.target.value);
-        },
-        []
-    );
-
-    const handleChangeTX = useCallback(
-        (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-            setReqBody(e.target.value);
-        },
-        []
-    );
-    const finalUrl = useMemo(() => {
-        const v = url.trim();
-        if (!v) return DEFAULT_ROUTE;
-
-        try {
-            const u = new URL(v, typeof window !== "undefined" ? window.location.origin : "http://localhost");
-            return u.toString();
-        } catch {
-            return DEFAULT_ROUTE;
-        }
-    }, [url]);
-
-    const gogo = async () => {
-        try {
-            let body = {}
-            if (reqBody) {
-                const obj = JSON.parse(reqBody);
-                console.log(obj)
-                body = obj
-            }
-
-            const res: GoRes<object> = await apiFetch(finalUrl, {
-                body,
-                method: selected,
-            })
-            if (res.code === 0) {
-                setResult(res.data)
-            }
-        } catch (error) {
-            console.log(error)
-
-        }
-    }
-    // Read the authorization code once
+    // อ่าน authorization code ครั้งเดียว
     const code = useMemo(() => searchParams.get("code"), [searchParams]);
 
     useEffect(() => {
         const exchange = async () => {
-            if (!code) return; // If no code, nothing to exchange (maybe came here directly)
+            if (!code) return; // ไม่มี code แสดงว่าไม่ได้มาจาก authorize
             setStatus("exchanging");
             setError(null);
 
@@ -111,7 +67,7 @@ function CallbackInner() {
                     throw new Error("Missing PKCE code_verifier in localStorage.");
                 }
 
-                // Build the Okta token endpoint URL
+                // Okta token endpoint
                 const tokenUrl = new URL(
                     `${process.env.NEXT_PUBLIC_OKTA_ISSUER}/v1/token`
                 );
@@ -136,14 +92,19 @@ function CallbackInner() {
                 }
 
                 const data = await res.json();
+
                 if (!data.id_token) {
                     throw new Error("No id_token in token response.");
                 }
 
+                // เก็บ/โชว์ token
                 localStorage.setItem("id_token", data.id_token);
                 setIdToken(data.id_token);
 
-                // Call your backend (Go Fiber) with the ID token
+                if (data.access_token) setAc(data.access_token);
+                if (data.refresh_token) setRe(data.refresh_token);
+
+                // (ออปชัน) call backend ที่ต้องการ id_token
                 setStatus("calling-api");
                 const apiUrl =
                     process.env.NEXT_PUBLIC_API_URL ??
@@ -154,7 +115,6 @@ function CallbackInner() {
                     credentials: "include",
                 });
 
-                // You may want to handle non-OK responses
                 if (!apiRes.ok) {
                     const txt = await apiRes.text();
                     throw new Error(
@@ -162,63 +122,57 @@ function CallbackInner() {
                     );
                 }
 
-                // If you need the response:
-                // const payload = await apiRes.json();
-                // console.log("Protected API result:", payload);
-
                 setStatus("done");
             } catch (e: unknown) {
                 const msg = e instanceof Error ? e.message : String(e);
                 setError(msg);
                 setStatus("error");
-                // Optional: clear sensitive values
-                // localStorage.removeItem("id_token");
             }
         };
 
         exchange();
     }, [code]);
 
+    // refresh token (เรียก backend ของคุณ)
     const refreshToken = async () => {
         try {
-            const res: GoRes<DataO> = await apiFetch("http://127.0.0.1:12345/api/v1/auth/refresh",
+            const res: GoRes<DataO> = await apiFetch(
+                "http://127.0.0.1:12345/api/v1/auth/refresh",
                 {
                     method: "POST",
-                    body: {
-                        "refreshToken": rt,
-                    },
+                    body: { refreshToken: re ?? rt ?? "" }, // ใช้ค่าจาก state ถ้าไม่มีลองค่าใน query
                     token: ac || "",
                 }
-            )
+            );
             if (res.code === 0) {
-                console.log("log refresh", res)
-                setOldAc(ac)
-                setOldRe(re)
-                setAc(res.data?.accessToken)
-                setRe(res.data?.refreshToken)
+                setOldAc(ac);
+                setOldRe(re);
+                setAc(res.data?.accessToken);
+                setRe(res.data?.refreshToken);
             } else {
-                console.error("Login failed:", res.message);
+                console.error("Refresh failed:", res.message);
             }
         } catch (error: unknown) {
-            console.log(error)
+            console.log(error);
         }
-    }
+    };
+
+    // revoke token (เรียก backend ของคุณ)
     const revokeToken = async () => {
         try {
-            const res = await apiFetch("http://127.0.0.1:12345/api/v1/auth/revoke",
-                {
-                    method: "POST",
-                    body: {},
-                    token: ac || "",
-                }
-            )
+            const res = await apiFetch("http://127.0.0.1:12345/api/v1/auth/revoke", {
+                method: "POST",
+                body: {},
+                token: ac || "",
+            });
             if (res.code === 0) {
-                console.log("log revoke", res)
+                console.log("revoked", res);
             }
         } catch (error) {
-            console.log(error)
+            console.log(error);
         }
-    }
+    };
+
     return (
         <div className="p-6 space-y-4">
             <h1 className="text-2xl font-semibold">Callback</h1>
@@ -226,12 +180,12 @@ function CallbackInner() {
             <div className="text-sm text-gray-600">
                 Status:{" "}
                 <span className="font-mono">
-                    {status === "idle" && "idle"}
+          {status === "idle" && "idle"}
                     {status === "exchanging" && "exchanging token…"}
                     {status === "calling-api" && "calling backend…"}
                     {status === "done" && "done"}
                     {status === "error" && "error"}
-                </span>
+        </span>
             </div>
 
             {error && (
@@ -242,78 +196,55 @@ function CallbackInner() {
             )}
 
             <div className="flex gap-[20px]">
-                <div className="w-[50%]">
-                    <div className="space-y-2">
-                        <div className="text-lg font-medium">ID Token</div>
-                        <div className="text-xs text-gray-500">
-                            {/* (Hidden in UI to avoid leaking sensitive data) */}
-                        </div>
-                        <div className="break-all font-mono rounded-md border p-2 bg-gray-50">
-                            {idToken ? idToken : TOKEN_PLACEHOLDER}
-
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <div className="text-lg font-medium">Access Token</div>
-                        <div className="text-xs text-gray-500">
-                            {/* (Hidden in UI to avoid leaking sensitive data) */}
-                        </div>
-                        <div className="break-all font-mono rounded-md border p-2 bg-gray-50">
-                            {ac ? ac : TOKEN_PLACEHOLDER}
-
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <div className="text-lg font-medium">Refresh Token</div>
-                        <div className="text-xs text-gray-500">
-                            {/* (Hidden in UI to avoid leaking sensitive data) */}
-                        </div>
-                        <div className="break-all font-mono rounded-md border p-2 bg-gray-50">
-                            {re ? re : TOKEN_PLACEHOLDER}
-
-                        </div>
-                    </div>
+                <div className="w-[50%] space-y-4">
+                    <TokenBox label="ID Token" value={idToken} />
+                    <TokenBox label="Access Token" value={ac} />
+                    <TokenBox label="Refresh Token" value={re} />
                 </div>
-                <div className="w-[50%]">
 
-                    <div className="space-y-2">
-                        <div className="text-lg font-medium text-gray-700">Old Access Token</div>
-                        <div className="text-xs text-gray-500">
-                            {/* (Hidden in UI to avoid leaking sensitive data) */}
-                        </div>
-                        <div className="break-all font-mono rounded-md border p-2 bg-gray-50">
-                            {oldAc ? oldAc : TOKEN_PLACEHOLDER}
-
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <div className="text-lg font-medium text-gray-700">Old Refresh Token</div>
-                        <div className="text-xs text-gray-500">
-                            {/* (Hidden in UI to avoid leaking sensitive data) */}
-                        </div>
-                        <div className="break-all font-mono rounded-md border p-2 bg-gray-50">
-                            {oldRe ? oldRe : TOKEN_PLACEHOLDER}
-
-                        </div>
-                    </div>
+                <div className="w-[50%] space-y-4">
+                    <TokenBox label="Old Access Token" value={oldAc} />
+                    <TokenBox label="Old Refresh Token" value={oldRe} />
                 </div>
             </div>
 
             {status !== "done" && <LoadingUI label="Logging in..." />}
 
-            <button
-                className="mt-6 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-2xl text-white transition"
-                onClick={refreshToken}
-            >
-                Refresh Token
-            </button>
-            <button
-                className="mt-6 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-2xl text-white transition"
-                onClick={revokeToken}
-            >
-                Revoke Token
-            </button>
+            <div className="flex gap-3">
+                <button
+                    className="mt-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-2xl text-white transition"
+                    onClick={refreshToken}
+                    disabled={!re && !rt}
+                    title={!re && !rt ? "No refresh token available" : ""}
+                >
+                    Refresh Token
+                </button>
+                <button
+                    className="mt-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-2xl text-white transition disabled:opacity-50"
+                    onClick={revokeToken}
+                    disabled={!ac}
+                    title={!ac ? "No access token" : ""}
+                >
+                    Revoke Token
+                </button>
+            </div>
+        </div>
+    );
+}
 
+function TokenBox({
+                      label,
+                      value,
+                  }: {
+    label: string;
+    value: string | null | undefined;
+}) {
+    return (
+        <div className="space-y-2">
+            <div className="text-lg font-medium">{label}</div>
+            <div className="break-all font-mono rounded-md border p-2 bg-gray-50">
+                {value ? value : TOKEN_PLACEHOLDER}
+            </div>
         </div>
     );
 }
@@ -326,7 +257,6 @@ function LoadingUI({ label }: { label: string }) {
         </div>
     );
 }
-
 
 function truncate(s: string, max: number) {
     return s.length > max ? s.slice(0, max - 1) + "…" : s;
