@@ -77,25 +77,37 @@ function CallbackInner() {
 
     const gogo = async () => {
         try {
-            let body = {}
-            if (reqBody) {
-                const obj = JSON.parse(reqBody);
-                console.log(obj)
-                body = obj
+            const method = (selected || "GET").toUpperCase();
+
+            // parse อย่างปลอดภัย + ปล่อย undefined ถ้าไม่มี body
+            let body: any | undefined = undefined;
+            if (reqBody && reqBody.trim() !== "") {
+                try {
+                    body = JSON.parse(reqBody);
+                } catch (e) {
+                    console.error("Invalid JSON in reqBody:", e);
+                    // แสดงแจ้งเตือนผู้ใช้หรือ return ออกเลยก็ได้
+                    return;
+                }
             }
 
             const res: GoRes<object> = await apiFetch(finalUrl, {
-                body,
-                method: selected,
-            })
+                method,
+                body, // apiFetch จะเปลี่ยนเป็น query string เองเมื่อเป็น GET/HEAD
+                // token: accessToken, // ถ้ามี Bearer token ใส่เพิ่มได้
+            });
+
             if (res.code === 0) {
-                setResult(res.data)
+                setResult(res.data);
+            } else {
+                console.warn("API returned non-zero code:", res.code, res.message);
+                // อยากโชว์ข้อความผิดพลาดก็ทำตรงนี้ได้
             }
         } catch (error) {
-            console.log(error)
-
+            console.error(error);
+            // setError(String(error)) // ถ้ามี state error
         }
-    }
+    };
     // Read the authorization code once
     const code = useMemo(() => searchParams.get("code"), [searchParams]);
 
@@ -219,6 +231,23 @@ function CallbackInner() {
             console.log(error)
         }
     }
+    const rht = async () => {
+        try {
+            window.location.assign("http://127.0.0.1:8080/api/start-stepup?txnId=txn123&bindingHash=abc123");
+        } catch (error) {
+            console.log(error)
+        }
+    }
+    // const rht = async () => {
+    //     try {
+    //         window.open(
+    //             "http://127.0.0.1:8080/api/start-stepup?txnId=txn123&bindingHash=abc123",
+    //             "_blank" // เปิดใน tab ใหม่
+    //         );
+    //     } catch (error) {
+    //         console.log(error);
+    //     }
+    // };
     return (
         <div className="p-6 space-y-4">
             <h1 className="text-2xl font-semibold">Callback</h1>
@@ -299,20 +328,29 @@ function CallbackInner() {
                 </div>
             </div>
 
-            {status !== "done" && <LoadingUI label="Logging in..." />}
+            {status !== "done" && <LoadingUI label="Logging in..."/>}
 
-            <button
-                className="mt-6 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-2xl text-white transition"
-                onClick={refreshToken}
-            >
-                Refresh Token
-            </button>
-            <button
-                className="mt-6 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-2xl text-white transition"
-                onClick={revokeToken}
-            >
-                Revoke Okta
-            </button>
+            <div className={`flex gap-[8px]`}>
+                <button
+                    className="mt-6 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-2xl text-white transition"
+                    onClick={refreshToken}
+                >
+                    Refresh Token
+                </button>
+                <button
+                    className="mt-6 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-2xl text-white transition"
+                    onClick={revokeToken}
+                >
+                    Revoke Okta
+                </button>
+                <button
+                    className="mt-6 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-2xl text-white transition"
+                    onClick={rht}
+                >
+                    Request Higher Token
+                </button>
+            </div>
+
 
             <div className="flex gap-[20px]">
                 <div className="w-[50%]">
@@ -407,7 +445,8 @@ function CallbackInner() {
                     <label htmlFor="">
                         Result Here
                     </label>
-                    <textarea className="border mb-2 border-amber-600 rounded-lg h-[600px] w-full px-2 outline-none" name="" id="" readOnly value={JSON.stringify(result, null, 2)}></textarea>
+                    <textarea className="border mb-2 border-amber-600 rounded-lg h-[600px] w-full px-2 outline-none"
+                              name="" id="" readOnly value={JSON.stringify(result, null, 2)}></textarea>
                 </div>
             </div>
 
@@ -415,7 +454,7 @@ function CallbackInner() {
     );
 }
 
-function LoadingUI({ label }: { label: string }) {
+function LoadingUI({label}: { label: string }) {
     return (
         <div className="flex items-center gap-2 text-gray-600">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-transparent" />
